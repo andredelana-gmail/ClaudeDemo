@@ -325,9 +325,18 @@
     if (!n) return null;
     for (const d of HANDLE_DIRS) {
       const p = handlePos(n, d);
-      if (Math.hypot(sx - p.x, sy - p.y) <= 13) return { nodeId: n.id, dir: d.dir, d };
+      if (Math.hypot(sx - p.x, sy - p.y) <= 16) return { nodeId: n.id, dir: d.dir, d };
     }
     return null;
+  }
+
+  // Expanded region around a box that comfortably includes its 4 + handles,
+  // so hover doesn't drop while the mouse travels from the box to a handle.
+  function withinHandleZone(n, sx, sy) {
+    const p = w2s(n.x, n.y);
+    const pad = 42 * view.zoom;
+    return sx >= p.x - pad && sx <= p.x + NODE_W * view.zoom + pad &&
+           sy >= p.y - pad && sy <= p.y + NODE_H * view.zoom + pad;
   }
   function arrowAt(sx, sy) {
     for (const a of model.arrows) {
@@ -412,11 +421,18 @@
       view.panY = panState.panY + (y - panState.y);
       return;
     }
-    // hover state for handles
-    const n = nodeAt(x, y);
-    hoverNode = n ? n.id : (handleAt(x, y) ? hoverNode : null);
+    // hover state for handles. Sticky: keep the handles alive while the mouse
+    // is anywhere near the box (including the gap between the box and its +
+    // buttons) so they don't vanish mid-reach.
+    const nUnder = nodeAt(x, y);
+    if (nUnder) {
+      hoverNode = nUnder.id;
+    } else if (hoverNode) {
+      const hn = engine.node(hoverNode);
+      if (!hn || !withinHandleZone(hn, x, y)) hoverNode = null;
+    }
     hoverHandle = handleAt(x, y);
-    canvas.style.cursor = hoverHandle ? 'crosshair' : n ? 'move' : 'grab';
+    canvas.style.cursor = hoverHandle ? 'crosshair' : nUnder ? 'move' : 'grab';
   });
 
   window.addEventListener('mouseup', (e) => {
